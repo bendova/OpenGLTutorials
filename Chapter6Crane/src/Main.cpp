@@ -13,7 +13,7 @@
 #include <fstream>
 #include <stdio.h>
 
-#include "MathUtil.h"
+#include "../framework/MathUtil.h"
 #include "Crane.h"
 
 GLuint gProgramID;
@@ -26,7 +26,7 @@ using namespace Hierarchy;
 
 void InitCameraToClipMatrix()
 {
-	gFrustumScale = MathUtil::GetFrustumScale(45.0f);
+	gFrustumScale = MyCode::MathUtil::GetFrustumScale(45.0f);
 	const float zNear = 1.0f;
 	const float zFar = 200.0f;
 	gCameraToClipMatrix[0].x = gFrustumScale;

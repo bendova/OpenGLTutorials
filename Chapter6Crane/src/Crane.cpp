@@ -1,5 +1,5 @@
 #include "Crane.h"
-#include "MathUtil.h"
+#include "../framework/MathUtil.h"
 
 namespace Hierarchy
 {
@@ -311,14 +311,14 @@ namespace Hierarchy
 
 	void Crane::MoveCraneForward(float deltaTime)
 	{
-		glm::vec4 rotatedDirection = MathUtil::RotateY(mCraneBaseAngleY) * glm::vec4(0.0f, 0.0f, mMovementPerSecond * deltaTime, 0.0f);
+		glm::vec4 rotatedDirection = MyCode::MathUtil::RotateY(mCraneBaseAngleY) * glm::vec4(0.0f, 0.0f, mMovementPerSecond * deltaTime, 0.0f);
 		mCraneBasePosition.x += rotatedDirection.x;
 		mCraneBasePosition.y += rotatedDirection.y;
 		mCraneBasePosition.z += rotatedDirection.z;
 	}
 	void Crane::MoveCraneBackward(float deltaTime)
 	{
-		glm::vec4 rotatedDirection = MathUtil::RotateY(mCraneBaseAngleY) * glm::vec4(0.0f, 0.0f, mMovementPerSecond * deltaTime, 0.0f);
+		glm::vec4 rotatedDirection = MyCode::MathUtil::RotateY(mCraneBaseAngleY) * glm::vec4(0.0f, 0.0f, mMovementPerSecond * deltaTime, 0.0f);
 		mCraneBasePosition.x -= rotatedDirection.x;
 		mCraneBasePosition.y -= rotatedDirection.y;
 		mCraneBasePosition.z -= rotatedDirection.z;
@@ -352,7 +352,7 @@ namespace Hierarchy
 	}
 	void Crane::IncArmAngleX(const float deltaAngle)
 	{
-		mForeArmAngleX = MathUtil::Clamp(mForeArmAngleX + deltaAngle, -30.0f, 100.0f);
+		mForeArmAngleX = MyCode::MathUtil::Clamp(mForeArmAngleX + deltaAngle, -30.0f, 100.0f);
 	}
 
 	void Crane::OpenFingers(float deltaTime)
@@ -365,6 +365,6 @@ namespace Hierarchy
 	}
 	void Crane::IncFingersAngleY(const float deltaAngle)
 	{
-		mBottomFingerAngleY = MathUtil::Clamp(mBottomFingerAngleY + deltaAngle, 0.0f, 50.0f);
+		mBottomFingerAngleY = MyCode::MathUtil::Clamp(mBottomFingerAngleY + deltaAngle, 0.0f, 50.0f);
 	}
 }

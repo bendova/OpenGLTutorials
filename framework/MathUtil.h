@@ -4,7 +4,7 @@
 #include <math.h>
 #include <glm/glm.hpp>
 
-namespace Hierarchy
+namespace MyCode
 {
 	namespace MathUtil
 	{

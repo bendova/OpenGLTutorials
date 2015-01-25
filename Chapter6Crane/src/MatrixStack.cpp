@@ -1,5 +1,5 @@
 #include "MatrixStack.h"
-#include "MathUtil.h"
+#include "../framework/MathUtil.h"
 
 namespace Hierarchy
 {
@@ -47,16 +47,16 @@ namespace Hierarchy
 
 	void MatrixStack::RotateX(float angleInDegrees)
 	{
-		mCurrentMatrix = mCurrentMatrix * MathUtil::RotateX(angleInDegrees);
+		mCurrentMatrix = mCurrentMatrix * MyCode::MathUtil::RotateX(angleInDegrees);
 	}
 
 	void MatrixStack::RotateY(float angleInDegrees)
 	{
-		mCurrentMatrix = mCurrentMatrix * MathUtil::RotateY(angleInDegrees);
+		mCurrentMatrix = mCurrentMatrix * MyCode::MathUtil::RotateY(angleInDegrees);
 	}
 
 	void MatrixStack::RotateZ(float angleInDegrees)
 	{
-		mCurrentMatrix = mCurrentMatrix * MathUtil::RotateZ(angleInDegrees);
+		mCurrentMatrix = mCurrentMatrix * MyCode::MathUtil::RotateZ(angleInDegrees);
 	}
 }

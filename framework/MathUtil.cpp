@@ -1,7 +1,7 @@
 #include <math.h>
 #include "MathUtil.h"
 
-namespace Hierarchy
+namespace MyCode
 {
 	namespace MathUtil
 	{
