@@ -14,7 +14,6 @@
 #include <vector>
 #include <memory>
 
-// FIXME - this is somehow broken 
 using MyCode::Mesh;
 //using Framework::Mesh;
 
@@ -267,11 +266,6 @@ void initCameraToClipTranform()
 	gCameraToClipTransform[3].z = (2 * zNear * zFar) / (zNear - zFar);
 }
 
-void updateMVPTransform()
-{
-	gMVPTransform = gCameraToClipTransform * gWorldToCameraTransform * gModelToWorldTransform;
-}
-
 void initTranformationMatrices()
 {
 	initWorldToCameraTranform();
@@ -335,32 +329,53 @@ void init()
 	glClearDepth(1.0f);
 }
 
+void updateMVPTransform()
+{
+	gMVPTransform = gCameraToClipTransform * gWorldToCameraTransform * gModelToWorldTransform;
+}
+
+void applyMVPTransform()
+{
+	updateMVPTransform();
+	glUniformMatrix4fv(gMVPTransformUniformID, 1, GL_FALSE, glm::value_ptr(gMVPTransform));
+}
+
 void setModelToWorldTransform(const glm::mat4& modelToWorldTransform)
 {
 	gModelToWorldTransform = modelToWorldTransform;
-	updateMVPTransform();
+	applyMVPTransform();
 }
 
 void setWorldToCameraTransform(const glm::mat4& worldToCameraTransform)
 {
 	gWorldToCameraTransform = worldToCameraTransform;
-	updateMVPTransform();
+	applyMVPTransform();
 }
 
-void drawCube()
+void drawCube(glutil::MatrixStack& modelMatrix)
 {
+	setModelToWorldTransform(modelMatrix.Top());
+
 	glBindVertexArray(gVertexArrayObjectID);
 	glDrawElements(GL_TRIANGLES, sizeof(gVertexIndexBuffer) / sizeof(gVertexIndexBuffer[0]), GL_UNSIGNED_SHORT, 0);
 	glBindVertexArray(GL_NONE);
 }
 
-void drawPlane()
+void drawPlane(glutil::MatrixStack& modelMatrix)
 {
+	glutil::PushStack push(modelMatrix);
+	modelMatrix.Scale(5.0f);
+	setModelToWorldTransform(modelMatrix.Top());
+
 	gPlaneMesh->Render();
 }
 
-void drawCylinder()
+void drawCylinder(glutil::MatrixStack& modelMatrix)
 {
+	glutil::PushStack push(modelMatrix);
+	modelMatrix.Translate(glm::vec3(0.0f, 0.51f, 0.0f));
+	setModelToWorldTransform(modelMatrix.Top());
+
 	gCylinderMesh->Render("color");
 }
 
@@ -375,12 +390,12 @@ void display()
 
 	glUseProgram(gProgramID);
 
-	setModelToWorldTransform(gViewPole.CalcMatrix());
-	glUniformMatrix4fv(gMVPTransformUniformID, 1, GL_FALSE, glm::value_ptr(gMVPTransform));
+	glutil::MatrixStack modelMatrix;
+	modelMatrix.SetMatrix(gViewPole.CalcMatrix());
 
-	//drawCube();
-	drawPlane();
-	drawCylinder();
+	//drawCube(modelMatrix);
+	drawPlane(modelMatrix);
+	drawCylinder(modelMatrix);
 	//drawCubeFromMesh();
 
 	glUseProgram(GL_NONE);

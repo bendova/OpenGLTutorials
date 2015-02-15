@@ -1,5 +1,5 @@
 
 SetupProject("Chapter9BasicLighting", 
-		"src/*.cpp",
-		"src/*.h",
+		"src/*.*",
+		"src/render/*.*",
 		"data/*.*")
