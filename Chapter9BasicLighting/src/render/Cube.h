@@ -11,7 +11,7 @@ namespace MyCode
 		Cube(const GLint vertexPositionAttributeID, const GLint vertexColorAttributeID);
 		~Cube();
 
-		void Render();
+		void Render() const;
 
 	private:
 		void InitVertexBuffer();

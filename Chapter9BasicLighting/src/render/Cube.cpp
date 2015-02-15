@@ -144,7 +144,7 @@ namespace MyCode
 	{
 	}
 
-	void Cube::Render()
+	void Cube::Render() const
 	{
 		glBindVertexArray(mVertexArrayObjectID);
 		glDrawElements(GL_TRIANGLES, sizeof(gVertexIndexBuffer) / sizeof(gVertexIndexBuffer[0]), GL_UNSIGNED_SHORT, 0);
