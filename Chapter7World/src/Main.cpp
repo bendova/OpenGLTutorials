@@ -135,7 +135,6 @@ void init()
 	glCullFace(GL_BACK);
 	glFrontFace(GL_CW);
 
-	// TODO why doesn't the below work?
 	glEnable(GL_DEPTH_TEST);
 	glDepthMask(GL_TRUE);
 	glDepthFunc(GL_LEQUAL);

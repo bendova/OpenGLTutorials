@@ -1,11 +1,22 @@
 #include <glload/gl_3_3.h>
 #include <GL/freeglut.h>
 #include "../framework/framework.h"
+#include "../framework/Mesh.h"
+#include "../framework/MyMesh.h"
 #include "../framework/MathUtil.h"
+#include "../framework/MousePole.h"
 #include "glm/glm.hpp"
 #include "glm/gtc/type_ptr.hpp"
+#include "glutil/MatrixStack.h"
+#include "glutil/MousePoles.h"
+#include "glm/gtc/quaternion.hpp"
 
 #include <vector>
+#include <memory>
+
+// FIXME - this is somehow broken 
+using MyCode::Mesh;
+//using Framework::Mesh;
 
 #define COLOR_RED		1.0f, 0.0f, 0.0f, 1.0f
 #define COLOR_GREEN		0.0f, 1.0f, 0.0f, 1.0f
@@ -109,7 +120,7 @@ const float gVertexBuffer[] =
 	COLOR_CYAN,
 };
 
-const GLshort gVertexIndexBuffer[] =
+const GLushort gVertexIndexBuffer[] =
 {
 	// front face
 	0, 1, 2,
@@ -150,6 +161,34 @@ glm::mat4 gModelToWorldTransform;
 glm::mat4 gWorldToCameraTransform;
 glm::mat4 gCameraToClipTransform;
 glm::mat4 gMVPTransform;
+
+glutil::ObjectData gInitialObjectData =
+{
+	glm::vec3(0.0f, 0.5f, 0.0f),
+	glm::fquat(1.0f, 0.0f, 0.0, 0.0f)
+};
+
+glutil::ViewData gInitialViewData =
+{
+	glm::vec3(0.0f, 0.5f, 0.0f),
+	glm::fquat(0.9238f, 0.38268f, 0.0f, 0.0f),
+	5.0f,
+	0.0f
+};
+
+glutil::ViewScale gViewScale =
+{
+	3.0f, 20.0f,
+	1.5f, 0.5f,
+	0.0f, 0.0f,
+	90.0f / 250.0f
+};
+
+glutil::ViewPole gViewPole = glutil::ViewPole(gInitialViewData, gViewScale, glutil::MB_LEFT_BTN);
+
+std::unique_ptr<Mesh> gCubeMesh;
+std::unique_ptr<Mesh> gCylinderMesh;
+std::unique_ptr<Mesh> gPlaneMesh;
 
 void initProgram()
 {
@@ -237,7 +276,34 @@ void initTranformationMatrices()
 {
 	initWorldToCameraTranform();
 	initCameraToClipTranform();
-	updateMVPTransform();
+}
+
+void loadMeshes()
+{
+	gCylinderMesh = std::unique_ptr<Mesh>(new Mesh("UnitCylinder.xml")); 
+	gPlaneMesh = std::unique_ptr<Mesh>(new Mesh("UnitPlane.xml"));
+	gCubeMesh = std::unique_ptr<Mesh>(new Mesh("UnitCube.xml"));
+}
+
+namespace
+{
+	void onMouseClick(int button, int state, int x, int y)
+	{
+		Framework::ForwardMouseButton(gViewPole, button, state, x, y);
+		glutPostRedisplay();
+	}
+
+	void onMouseMoved(int x, int y)
+	{
+		Framework::ForwardMouseMotion(gViewPole, x, y);
+		glutPostRedisplay();
+	}
+
+	void onMouseWheel(int wheel, int direction, int x, int y)
+	{
+		Framework::ForwardMouseWheel(gViewPole, wheel, direction, x, y);
+		glutPostRedisplay();
+	}
 }
 
 void init()
@@ -248,6 +314,12 @@ void init()
 	initVertexArrayObject();
 
 	initTranformationMatrices();
+
+	loadMeshes();
+
+	glutMouseFunc(onMouseClick);
+	glutMotionFunc(onMouseMoved);
+	glutMouseWheelFunc(onMouseWheel);
 
 	glEnable(GL_CULL_FACE);
 	glCullFace(GL_BACK);
@@ -263,53 +335,55 @@ void init()
 	glClearDepth(1.0f);
 }
 
-void translateCube(const glm::vec3& translation)
+void setModelToWorldTransform(const glm::mat4& modelToWorldTransform)
 {
-	gModelToWorldTransform[3] = glm::vec4(translation, 1.0f);
+	gModelToWorldTransform = modelToWorldTransform;
 	updateMVPTransform();
 }
 
-void rotateCube(const glm::mat4& rotationMatrix)
+void setWorldToCameraTransform(const glm::mat4& worldToCameraTransform)
 {
-	gModelToWorldTransform *= rotationMatrix;
+	gWorldToCameraTransform = worldToCameraTransform;
 	updateMVPTransform();
-}
-
-void rotateCubeX(float angleInDegrees)
-{
-	rotateCube(MyCode::MathUtil::RotateX(angleInDegrees));
-}
-
-void rotateCubeY(float angleInDegrees)
-{
-	rotateCube(MyCode::MathUtil::RotateY(angleInDegrees));
-}
-
-void rotateCubeZ(float angleInDegrees)
-{
-	rotateCube(MyCode::MathUtil::RotateZ(angleInDegrees));
 }
 
 void drawCube()
 {
-	glUseProgram(gProgramID);
 	glBindVertexArray(gVertexArrayObjectID);
-
-	rotateCubeX(-30.0f);
-	translateCube(glm::vec3(0.0, 0.0f, -5.0f));
-	glUniformMatrix4fv(gMVPTransformUniformID, 1, GL_FALSE, glm::value_ptr(gMVPTransform));
-
 	glDrawElements(GL_TRIANGLES, sizeof(gVertexIndexBuffer) / sizeof(gVertexIndexBuffer[0]), GL_UNSIGNED_SHORT, 0);
-
 	glBindVertexArray(GL_NONE);
-	glUseProgram(GL_NONE);
+}
+
+void drawPlane()
+{
+	gPlaneMesh->Render();
+}
+
+void drawCylinder()
+{
+	gCylinderMesh->Render("color");
+}
+
+void drawCubeFromMesh()
+{
+	gCubeMesh->Render();
 }
 
 void display()
 {
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-	drawCube();
+	glUseProgram(gProgramID);
+
+	setModelToWorldTransform(gViewPole.CalcMatrix());
+	glUniformMatrix4fv(gMVPTransformUniformID, 1, GL_FALSE, glm::value_ptr(gMVPTransform));
+
+	//drawCube();
+	drawPlane();
+	drawCylinder();
+	//drawCubeFromMesh();
+
+	glUseProgram(GL_NONE);
 
 	glutSwapBuffers();
 }

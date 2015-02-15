@@ -7,7 +7,6 @@
 #include <sstream>
 #include <utility>
 #include <type_traits>
-#include <glload/gl_3_3.h>
 #include "../framework/framework.h"
 #include "../framework/rapidxml.hpp"
 #include "../framework/rapidxml_helpers.h"
@@ -90,13 +89,19 @@ namespace MyCode
 
 	void WriteUShortsArrayToBuffer(GLenum glBuffer, std::vector<AttributeData>& attributeData, size_t offset)
 	{
-
+		std::vector<GLushort> attributeDataCopy;
+		attributeDataCopy.reserve(attributeData.size());
+		for (unsigned i = 0; i < attributeData.size(); ++i)
+		{
+			attributeDataCopy.push_back(attributeData[i].ushortValue);
+		}
+		glBufferSubData(glBuffer, offset, attributeDataCopy.size() * sizeof(GLushort), &attributeDataCopy[0]);
 	}
 
 	std::map<const std::string, const AttributeType> gAttributeTypeMap =
 	{
-		{ "float", { "float", GL_FLOAT, sizeof(GL_FLOAT), false, ParseFloatsArrayData, WriteFlotsArrayToBuffer } },
-		{ "ushort", { "ushort", GL_UNSIGNED_SHORT, sizeof(GL_UNSIGNED_SHORT), false, ParseUShortArrayData, WriteUShortsArrayToBuffer } }
+		{ "float", { "float", GL_FLOAT, sizeof(GLfloat), false, ParseFloatsArrayData, WriteFlotsArrayToBuffer } },
+		{ "ushort", { "ushort", GL_UNSIGNED_SHORT, sizeof(GLushort), false, ParseUShortArrayData, WriteUShortsArrayToBuffer } }
 	};
 
 	class Attribute
@@ -122,6 +127,11 @@ namespace MyCode
 		size_t GetSizeInBytes()
 		{
 			return mAttributeData.size() * mType->mBytesCount;
+		}
+
+		int GetIndex()
+		{
+			return mIndex;
 		}
 
 	private:
@@ -215,7 +225,13 @@ namespace MyCode
 
 	std::map<std::string, GLenum> gPrimitiveTypes =
 	{
-		{ "triangles", GL_TRIANGLES }
+		{ "triangles", GL_TRIANGLES },
+		{ "tri-strip", GL_TRIANGLE_STRIP },
+		{ "tri-fan", GL_TRIANGLE_FAN },
+		{ "lines", GL_LINES },
+		{ "line-strip", GL_LINE_STRIP },
+		{ "line-loop", GL_LINE_LOOP },
+		{ "points", GL_POINTS },
 	};
 
 	struct RenderCommand
@@ -294,6 +310,9 @@ namespace MyCode
 		GLuint mVertexBufferID;
 		GLuint mIndexBufferID;
 		std::vector<RenderCommand> mRenderCommands;
+		NamedVaoVector mNamedVAOsVector;
+		NamedVaoMap mNamedVAOsMap;
+		std::pair<std::vector<size_t>, size_t> mAttributeBufferOffsetsData;
 	};
 
 	Mesh::Mesh(std::string meshPath)
@@ -350,36 +369,37 @@ namespace MyCode
 		auto attributes = ParseXMLDataForAttributes(rootNode);
 		auto indices = ParseXMLDataForIndices(rootNode);
 		ParseXMLDataForArrays(rootNode);
-		InitMeshData(std::forward<AttributeVectorPtr>(attributes), 
-			std::forward<IndexDataVectorPtr>(indices));
+		ParseXMLDataForNamedVAOs(rootNode);
+		InitMeshData(std::forward<AttributeVector>(attributes), 
+			std::forward<IndexDataVector>(indices));
 	}
 
-	Mesh::AttributeVectorPtr Mesh::ParseXMLDataForAttributes(rapidxml::xml_node<char>* rootNode)
+	Mesh::AttributeVector Mesh::ParseXMLDataForAttributes(rapidxml::xml_node<char>* rootNode)
 	{
 		rapidxml::xml_node<char>* node = rootNode->first_node("attribute");
 		PARSE_ASSERT(rootNode, "The mesh should have at least one 'attribute' node in " + mMeshFilePath);
 
-		AttributeVectorPtr attributes = std::make_unique<std::vector<Attribute>>();
+		AttributeVector attributes = std::vector<Attribute>();
 		for (; node && (rapidxml::make_string_name(*node) == "attribute");
 			node = rapidxml::next_element(node))
 		{
-			attributes->push_back(Attribute(*node));
+			attributes.push_back(Attribute(*node));
 		}
 
 		return attributes;
 	}
 
-	Mesh::IndexDataVectorPtr Mesh::ParseXMLDataForIndices(rapidxml::xml_node<char>* rootNode)
+	Mesh::IndexDataVector Mesh::ParseXMLDataForIndices(rapidxml::xml_node<char>* rootNode)
 	{
 		rapidxml::xml_node<char>* node = rootNode->first_node("indices");
 
-		IndexDataVectorPtr indices = std::make_unique<std::vector<IndexData>>();
+		IndexDataVector indices = std::vector<IndexData>();
 		for (;
 			node && (rapidxml::make_string_name(*node) == "indices");
 			node = rapidxml::next_element(node))
 		{
 			mMeshData->mRenderCommands.push_back(ParseXMLForRenderCommand(*node));
-			indices->push_back(IndexData(*node));
+			indices.push_back(IndexData(*node));
 		}
 		return indices;
 	}
@@ -395,7 +415,32 @@ namespace MyCode
 		}
 	}
 
-	void Mesh::InitMeshData(AttributeVectorPtr attributes, IndexDataVectorPtr indices)
+	void Mesh::ParseXMLDataForNamedVAOs(rapidxml::xml_node<char>* rootNode)
+	{
+		rapidxml::xml_node<char>* node = rootNode->first_node("vao");
+		for (;
+			node && (make_string_name(*node) == "vao");
+			node = rapidxml::next_element(node))
+		{
+			mMeshData->mNamedVAOsVector.push_back(ParseXMLDataForVAO(node));
+		}
+	}
+
+	NamedVao Mesh::ParseXMLDataForVAO(rapidxml::xml_node<char>* vaoElem)
+	{
+		std::string vaoName = rapidxml::get_attrib_string(*vaoElem, "name");
+		std::vector<GLuint> sourceAttribIndexes;
+		for (const rapidxml::xml_node<> *pSource = vaoElem->first_node("source");
+			pSource;
+			pSource = pSource->next_sibling("source"))
+		{
+			sourceAttribIndexes.push_back(rapidxml::get_attrib_int(*pSource, "attrib", OnParseAttributeError));
+		}
+		return std::make_pair<std::string, std::vector<GLuint>>(std::forward<std::string>(vaoName), 
+			std::forward<std::vector<GLuint>>(sourceAttribIndexes));
+	}
+
+	void Mesh::InitMeshData(AttributeVector attributes, IndexDataVector indices)
 	{
 		glGenVertexArrays(1, &mMeshData->mVertexArrayObjectID);
 		glBindVertexArray(mMeshData->mVertexArrayObjectID);
@@ -405,27 +450,28 @@ namespace MyCode
 		glBindVertexArray(GL_NONE);
 
 		SetupIndices(indices);
+		SetupNamedVAOsMap(attributes);
 	}
 
-	void Mesh::SetupAttributes(AttributeVectorPtr& attributes)
+	void Mesh::SetupAttributes(AttributeVector& attributes)
 	{
-		auto bufferOffsetsPair = GetBufferOffsets(attributes);
-		auto& attributesOffsets = bufferOffsetsPair.first;
-		size_t attributesBufferSize = bufferOffsetsPair.second;
+		mMeshData->mAttributeBufferOffsetsData = GetBufferOffsets(attributes);
+		auto& attributesOffsets = mMeshData->mAttributeBufferOffsetsData.first;
+		size_t attributesBufferSize = mMeshData->mAttributeBufferOffsetsData.second;
 
 		glGenBuffers(1, &mMeshData->mVertexBufferID);
 		glBindBuffer(GL_ARRAY_BUFFER, mMeshData->mVertexBufferID);
 		glBufferData(GL_ARRAY_BUFFER, attributesBufferSize, NULL, GL_STATIC_DRAW);
 
-		for (unsigned i = 0; i < attributes->size(); ++i)
+		for (unsigned i = 0; i < attributes.size(); ++i)
 		{
-			Attribute& attribute = (*attributes)[i];
+			Attribute& attribute = attributes[i];
 			attribute.FillBoundBufferObject(attributesOffsets[i]);
 			attribute.SetupAttributeArray(attributesOffsets[i]);
 		}
 	}
 
-	void Mesh::SetupIndices(IndexDataVectorPtr& indices)
+	void Mesh::SetupIndices(IndexDataVector& indices)
 	{
 		auto bufferOffsetsPair = GetBufferOffsets(indices);
 		auto& indicesOffsets = bufferOffsetsPair.first;
@@ -438,24 +484,22 @@ namespace MyCode
 			glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mMeshData->mIndexBufferID);
 			glBufferData(GL_ELEMENT_ARRAY_BUFFER, indicesBufferSize, NULL, GL_STATIC_DRAW);
 
-			for (unsigned i = 0; i < indices->size(); ++i)
+			for (unsigned i = 0; i < indices.size(); ++i)
 			{
-				(*indices)[i].FillBoundBufferObject(indicesOffsets[i]);
+				indices[i].FillBoundBufferObject(indicesOffsets[i]);
 			}
 
-			unsigned indexedCommandIndex = 0;
 			auto& renderCommands = mMeshData->mRenderCommands;
 			for (unsigned i = 0; i < renderCommands.size(); ++i)
 			{
 				auto& renderCommand = renderCommands[i];
 				if (renderCommand.mIsIndexed)
 				{
-					auto& indexData = (*indices)[i];
+					auto& indexData = indices[i];
 
 					renderCommand.mStartIndex = static_cast<GLuint>(indicesOffsets[i]);
 					renderCommand.mCount = static_cast<GLuint>(indexData.GetDataSize());
 					renderCommand.mDataType = indexData.GetGLType();
-					++indexedCommandIndex;
 				}
 			}
 
@@ -463,7 +507,41 @@ namespace MyCode
 		}
 	}
 
-	void Mesh::Render()
+	void Mesh::SetupNamedVAOsMap(AttributeVector& attributes)
+	{
+		for (auto& namedVao : mMeshData->mNamedVAOsVector)
+		{
+			GLuint vao = -1;
+			glGenVertexArrays(1, &vao);
+			glBindVertexArray(vao);
+
+			auto& attributesOffsets = mMeshData->mAttributeBufferOffsetsData.first;
+			for (size_t iAttribIx = 0; iAttribIx < namedVao.second.size(); iAttribIx++)
+			{
+				GLuint iAttrib = namedVao.second[iAttribIx];
+				int iAttribOffset = -1;
+				for (size_t iCount = 0; iCount < attributes.size(); ++iCount)
+				{
+					if (attributes[iCount].GetIndex() == iAttrib)
+					{
+						iAttribOffset = iCount;
+						break;
+					}
+				}
+
+				Attribute &attrib = attributes[iAttribOffset];
+				attrib.SetupAttributeArray(attributesOffsets[iAttribOffset]);
+			}
+
+			mMeshData->mNamedVAOsMap[namedVao.first] = vao;
+
+			glBindVertexArray(vao);
+			glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mMeshData->mIndexBufferID);
+		}
+		glBindVertexArray(GL_NONE);
+	}
+
+	void Mesh::Render() const
 	{
 		if (mMeshData->mVertexArrayObjectID != GL_NONE)
 		{
@@ -474,6 +552,21 @@ namespace MyCode
 				renderCommand.Render();
 			}
 
+			glBindVertexArray(GL_NONE);
+		}
+	}
+
+	void Mesh::Render(const std::string& vaoName) const
+	{
+		auto iter = mMeshData->mNamedVAOsMap.find(vaoName);
+		if (iter != mMeshData->mNamedVAOsMap.end())
+		{
+			auto vaoIndex = iter->second;
+			glBindVertexArray(vaoIndex);
+			for (auto& renderCommand : mMeshData->mRenderCommands)
+			{
+				renderCommand.Render();
+			}
 			glBindVertexArray(GL_NONE);
 		}
 	}
