@@ -14,7 +14,7 @@ namespace MyCode
 		float GetFrustumScale(float angleInDegrees)
 		{
 			float halfAngleInRadians = DegreesToRadians(angleInDegrees) / 2.0f;
-			return 1.0f / tan(halfAngleInRadians / 2.0f);
+			return 1.0f / tan(halfAngleInRadians);
 		}
 
 		glm::mat4 RotateX(float angleInDegrees)

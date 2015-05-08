@@ -53,7 +53,7 @@ const float gVertexData[] =
 
 const float FRUSTUM_SCALE = 0.5f;
 const unsigned MATRIX_SIZE = 16;
-float gPerspectiveMatrix[MATRIX_SIZE]; // in row major order
+float gPerspectiveMatrix[MATRIX_SIZE]; // in column major order
 
 GLuint gProgramID;
 GLuint gVertexBufferID;
